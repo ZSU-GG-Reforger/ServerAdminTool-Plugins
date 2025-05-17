@@ -1,14 +1,3 @@
-# ServerAdminTool-Plugins
-Plugins for ReforgerJS
-
-## Requirements
-- ReforgerJS (1.4.0+)
-
-## Installation
-- Place the .js plugins file in the ReforgerJS plugins directory: `reforger-server/plugins`
-- Insert in your ReforgerJS configuration file the plugin configuration, as shown in [Example Configuration](#example-configuration)
-
-```json
 {
   "plugins": [
     {
@@ -33,4 +22,3 @@ Plugins for ReforgerJS
     }
   ]
 }
-```
