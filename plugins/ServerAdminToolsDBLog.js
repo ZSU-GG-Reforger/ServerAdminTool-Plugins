@@ -9,7 +9,7 @@ class ServerAdminToolsDBLog {
     this.serverId = null;
   }
 
-  async prepareToMount(serverInstance) {
+ async prepareToMount(serverInstance) {
     await this.cleanup();
     this.serverInstance = serverInstance;
 
@@ -54,6 +54,8 @@ class ServerAdminToolsDBLog {
       }
 
       await this.setupSchema();
+      await this.migrateSchema();
+      
       this.setupEventListeners();
       this.isInitialized = true;
       logger.info("ServerAdminToolsDBLog initialized successfully");
@@ -129,6 +131,65 @@ class ServerAdminToolsDBLog {
     }
   }
   
+async migrateSchema() {
+    try {
+      const connection = await process.mysqlPool.getConnection();
+      
+      const tables = [
+        'sat_player_killed',
+        'sat_base_capture', 
+        'sat_admin_action',
+        'sat_game_end'
+      ];
+      
+      for (const tableName of tables) {
+        await this.migrateTableToUtf8mb4(connection, tableName);
+      }
+      
+      connection.release();
+    } catch (error) {
+      logger.error(`ServerAdminToolsDBLog: Error during schema migration: ${error.message}`);
+      throw error;
+    }
+  }
+  
+  async migrateTableToUtf8mb4(connection, tableName) {
+    try {
+      const [tableExists] = await connection.query(
+        `SELECT COUNT(*) as count FROM information_schema.tables 
+         WHERE table_schema = DATABASE() AND table_name = ?`,
+        [tableName]
+      );
+      
+      if (tableExists[0].count === 0) {
+        return;
+      }
+      
+      const [tableInfo] = await connection.query(
+        `SELECT table_collation FROM information_schema.tables 
+         WHERE table_schema = DATABASE() AND table_name = ?`,
+        [tableName]
+      );
+      
+      const currentCollation = tableInfo[0].table_collation;
+      
+      if (currentCollation && currentCollation.startsWith('utf8mb4_')) {
+        return;
+      }
+      
+      logger.info(`ServerAdminToolsDBLog: Migrating table ${tableName} to utf8mb4...`);
+      
+      await connection.query(
+        `ALTER TABLE ${tableName} CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+      );
+      
+    } catch (error) {
+      logger.error(`ServerAdminToolsDBLog: Error migrating table ${tableName}: ${error.message}`);
+      throw error;
+    }
+  }
+
+
   async ensureServerColumn(connection, tableName) {
     try {
       const [tables] = await connection.query(
